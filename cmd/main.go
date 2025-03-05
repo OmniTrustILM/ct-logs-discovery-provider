@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-var version = "1.0.0"
+var version = "1.0.1"
 
 var routes map[string][]model.EndpointDto
 
