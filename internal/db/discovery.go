@@ -183,10 +183,11 @@ func (d *DiscoveryRepository) DeleteDiscovery(discovery *Discovery) error {
 }
 
 func (d *DiscoveryRepository) DeleteOrphanedCertificates() error {
-	dc := tbl("discovery_certificates")
+	dcTbl := tbl("discovery_certificates")
+	certTbl := tbl("certificates")
 
 	return d.db.
-		Where("NOT EXISTS (SELECT 1 FROM " + dc + " dc WHERE dc.certificate_id = certificates.id)").
+		Where("NOT EXISTS (SELECT 1 FROM " + dcTbl + " dc WHERE dc.certificate_id = " + certTbl + ".id)").
 		Delete(&Certificate{}).Error
 }
 
