@@ -1,6 +1,6 @@
 module CZERTAINLY-CT-Logs-Discovery-Provider
 
-go 1.22.2
+go 1.24.4
 
 require (
 	github.com/golang-migrate/migrate/v4 v4.17.1
@@ -30,8 +30,8 @@ require (
 	github.com/tidwall/pretty v1.2.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.31.0 // indirect
-	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/crypto v0.36.0 // indirect
+	golang.org/x/sync v0.12.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
 	gorm.io/driver/mysql v1.5.6 // indirect
 )
