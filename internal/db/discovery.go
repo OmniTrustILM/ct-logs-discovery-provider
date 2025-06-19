@@ -143,20 +143,34 @@ func (d *DiscoveryRepository) UpdateDiscovery(discovery *Discovery) error {
 
 func (d *DiscoveryRepository) List(pagination Pagination, discovery *Discovery) (*Pagination, error) {
 	var certificates []*Certificate
-	page := pagination.Page
-	pageSize := pagination.Limit
-	var count int
+	page, pageSize := pagination.Page, pagination.Limit
 	offset := (page - 1) * pageSize
-	d.db.Table("certificates").Select("certificates.*").
-		Joins("JOIN discovery_certificates ON discovery_certificates.certificate_id = certificates.id").
-		Where("discovery_certificates.discovery_id = ?", discovery.Id).
-		Order("id asc").
-		Offset(offset).Limit(pageSize).Find(&certificates)
+
+	certTbl := tbl("certificates")
+	linkTbl := tbl("discovery_certificates")
+
+	// build the base query only once
+	q := d.db.Table(certTbl).
+		Select(certTbl+".*").
+		Joins("JOIN "+linkTbl+" dc ON dc.certificate_id = "+certTbl+".id").
+		Where("dc.discovery_id = ?", discovery.Id)
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, err
+	}
+
+	if err := q.
+		Order(certTbl + ".id").
+		Offset(offset).
+		Limit(pageSize).
+		Find(&certificates).Error; err != nil {
+		return nil, err
+	}
 
 	pagination.Rows = certificates
-	pagination.TotalRows = int64(len(discovery.Certificates))
-	totalPages := int(math.Ceil(float64(count) / float64(pagination.Limit)))
-	pagination.TotalPages = totalPages
+	pagination.TotalRows = total
+	pagination.TotalPages = int(math.Ceil(float64(total) / float64(pageSize)))
 	return &pagination, nil
 }
 
@@ -169,17 +183,12 @@ func (d *DiscoveryRepository) DeleteDiscovery(discovery *Discovery) error {
 }
 
 func (d *DiscoveryRepository) DeleteOrphanedCertificates() error {
-	tx := d.db.Begin()
-	if tx.Error != nil {
-		return tx.Error
-	}
+	dcTbl := tbl("discovery_certificates")
+	certTbl := tbl("certificates")
 
-	if err := tx.Where("id NOT IN (SELECT certificate_id FROM discovery_certificates)").Delete(&Certificate{}).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	return tx.Commit().Error
+	return d.db.
+		Where("NOT EXISTS (SELECT 1 FROM " + dcTbl + " dc WHERE dc.certificate_id = " + certTbl + ".id)").
+		Delete(&Certificate{}).Error
 }
 
 type Pagination struct {
