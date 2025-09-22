@@ -4,15 +4,15 @@ go 1.24.4
 
 require (
 	github.com/golang-migrate/migrate/v4 v4.17.1
-	github.com/google/uuid v1.4.0
+	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/lib/pq v1.10.9
 	github.com/tidwall/gjson v1.17.3
 	github.com/yuseferi/zax/v2 v2.3.1
 	go.uber.org/zap v1.27.0
-	gorm.io/datatypes v1.2.1
+	gorm.io/datatypes v1.2.7
 	gorm.io/driver/postgres v1.5.9
-	gorm.io/gorm v1.25.11
+	gorm.io/gorm v1.30.0
 )
 
 require (
