@@ -7,7 +7,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/lib/pq v1.12.3
-	github.com/tidwall/gjson v1.19.0
+	github.com/tidwall/gjson v1.20.0
 	go.uber.org/zap v1.28.0
 	gorm.io/datatypes v1.2.7
 	gorm.io/driver/postgres v1.6.2
