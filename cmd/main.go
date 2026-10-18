@@ -29,8 +29,13 @@ func main() {
 	routes = make(map[string][]model.EndpointDto)
 	c := config.Get()
 	log.Info("Starting CT-Logs-Discovery-Provider", zap.String("version", version))
-	conn, _ := db.ConnectDB(c)
-	db.MigrateDB(c, conn)
+	conn, err := db.ConnectDB(c)
+	if err != nil {
+		log.Fatal("Database connection failed", zap.Error(err))
+	}
+	if err := db.MigrateDB(c, conn); err != nil {
+		log.Fatal("Database migration failed", zap.Error(err))
+	}
 	discoveryRepo, _ := db.NewDiscoveryRepository(conn)
 
 	// Schedule the cleanup task
@@ -68,7 +73,7 @@ func main() {
 	topMux.Handle("/v1/", logMiddleware(healthRouter))
 	topMux.Handle("/v1/discoveryProvider/", logMiddleware(discoveryRouter))
 
-	err := http.ListenAndServe(":"+c.Server.Port, topMux)
+	err = http.ListenAndServe(":"+c.Server.Port, topMux)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
