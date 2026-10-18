@@ -12,7 +12,6 @@ import (
 	"github.com/OmniTrustILM/ct-logs-discovery-provider/internal/model"
 	"github.com/OmniTrustILM/ct-logs-discovery-provider/internal/utils"
 	"github.com/gorilla/mux"
-	"github.com/lib/pq"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
@@ -31,18 +30,6 @@ func main() {
 	c := config.Get()
 	log.Info("Starting CT-Logs-Discovery-Provider", zap.String("version", version))
 	conn, _ := db.ConnectDB(c)
-	schema := config.Get().Database.Schema
-
-	err := conn.Exec("CREATE SCHEMA IF NOT EXISTS " + pq.QuoteIdentifier(schema)).Error
-	if err != nil {
-		log.Error("Error creating schema", zap.Error(err))
-	}
-
-	err = conn.Exec("SET search_path TO " + pq.QuoteIdentifier(schema)).Error
-	if err != nil {
-		log.Error("Error setting search_path", zap.Error(err))
-	}
-
 	db.MigrateDB(c, conn)
 	discoveryRepo, _ := db.NewDiscoveryRepository(conn)
 
@@ -81,7 +68,7 @@ func main() {
 	topMux.Handle("/v1/", logMiddleware(healthRouter))
 	topMux.Handle("/v1/discoveryProvider/", logMiddleware(discoveryRouter))
 
-	err = http.ListenAndServe(":"+c.Server.Port, topMux)
+	err := http.ListenAndServe(":"+c.Server.Port, topMux)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
