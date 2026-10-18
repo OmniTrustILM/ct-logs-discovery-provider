@@ -352,3 +352,87 @@ func TestDiscoverCertificateToleratesAnEmptyDomainAndForeignCredential(t *testin
 		t.Errorf("code: got %d, want %d", response.Code, http.StatusNotFound)
 	}
 }
+
+// TestSSLMateErrorMessageHandlesATransportError covers the SSLMate API being
+// unreachable (connection refused, DNS failure, timeout). The error the
+// client returns in that case is a plain *url.Error, not a
+// *sslmate.GenericOpenAPIError, so sslMateErrorMessage must fall back to
+// err.Error() instead of panicking on an unchecked type assertion.
+func TestSSLMateErrorMessageHandlesATransportError(t *testing.T) {
+	_, err := http.Get("http://127.0.0.1:1") // a port nothing listens on
+	if err == nil {
+		t.Fatal("expected a transport error dialing an unreachable address")
+	}
+
+	got := sslMateErrorMessage(err)
+
+	if got != err.Error() {
+		t.Errorf("message: got %q, want %q", got, err.Error())
+	}
+}
+
+// issuancesErrorFromServer starts an httptest server that answers every
+// request with the given status and body, makes one real GetIssuances call
+// against it, and returns the resulting error. The error's dynamic type and
+// Model() are therefore exactly what the real sslmate client produces for
+// that response, not a hand-built stand-in - GenericOpenAPIError's fields
+// are unexported, so this is the only way to get one from outside the
+// sslmate package.
+func issuancesErrorFromServer(t *testing.T, status int, body string) error {
+	t.Helper()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(server.Close)
+
+	clientConfig := sslmate.NewConfiguration()
+	clientConfig.Servers = sslmate.ServerConfigurations{{URL: server.URL}}
+	client := sslmate.NewAPIClient(clientConfig)
+
+	_, _, err := client.CTSearchV1APIService.GetIssuances(
+		context.Background(), zap.NewNop(), "example.com", "", false, false, "",
+		time.Now().Add(-time.Hour), time.Now(),
+	).Execute()
+	if err == nil {
+		t.Fatalf("expected an error from a %d response", status)
+	}
+	return err
+}
+
+// TestSSLMateErrorMessageUsesTheDecodedErrorObject covers the ordinary case:
+// an OpenAPI error response whose body decoded into a sslmate.ErrorObject.
+func TestSSLMateErrorMessageUsesTheDecodedErrorObject(t *testing.T) {
+	err := issuancesErrorFromServer(t, http.StatusTooManyRequests, `{"code":"rate_limited","message":"rate limited"}`)
+
+	got := sslMateErrorMessage(err)
+
+	if got != "rate limited" {
+		t.Errorf("message: got %q, want %q", got, "rate limited")
+	}
+}
+
+// TestSSLMateErrorMessageHandlesAGenericOpenAPIErrorWithNoModel covers a
+// *sslmate.GenericOpenAPIError whose Model() is nil: an OpenAPI error
+// outside the 400-599 range (a 3xx, say) never gets a model attached. The
+// unchecked `.Model().(sslmate.ErrorObject)` assertion this replaces panics
+// on a nil interface; sslMateErrorMessage must fall back to err.Error().
+func TestSSLMateErrorMessageHandlesAGenericOpenAPIErrorWithNoModel(t *testing.T) {
+	err := issuancesErrorFromServer(t, http.StatusMovedPermanently, "")
+
+	var apiErr *sslmate.GenericOpenAPIError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("expected a *sslmate.GenericOpenAPIError, got %T", err)
+	}
+	if apiErr.Model() != nil {
+		t.Fatalf("expected a nil model for a 3xx response, got %#v", apiErr.Model())
+	}
+
+	got := sslMateErrorMessage(err)
+
+	if got != err.Error() {
+		t.Errorf("message: got %q, want %q", got, err.Error())
+	}
+}
