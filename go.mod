@@ -1,6 +1,6 @@
 module github.com/OmniTrustILM/ct-logs-discovery-provider
 
-go 1.26.6
+go 1.26.9
 
 require (
 	github.com/golang-migrate/migrate/v4 v4.20.1
