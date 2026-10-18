@@ -1,4 +1,4 @@
-create table certificates
+create table if not exists certificates
 (
     id             serial,
     uuid           varchar not null unique,
@@ -7,9 +7,9 @@ create table certificates
     primary key (id)
 );
 
-CREATE INDEX index_certificates_uuid ON certificates (uuid);
+CREATE INDEX IF NOT EXISTS index_certificates_uuid ON certificates (uuid);
 
-create table discoveries
+create table if not exists discoveries
 (
     id     serial,
     uuid   varchar not null unique,
@@ -19,7 +19,7 @@ create table discoveries
     primary key (id)
 );
 
-create table discovery_certificates
+create table if not exists discovery_certificates
 (
     certificate_id bigint not null,
     discovery_id   bigint not null,
