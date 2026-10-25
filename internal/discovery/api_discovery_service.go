@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/OmniTrustILM/ct-logs-discovery-provider/internal/config"
 	"github.com/OmniTrustILM/ct-logs-discovery-provider/internal/db"
 	"github.com/OmniTrustILM/ct-logs-discovery-provider/internal/logger"
@@ -204,6 +205,24 @@ func newSSLMateClient() *sslmate.APIClient {
 	return sslmate.NewAPIClient(clientConfig)
 }
 
+// sslMateErrorMessage extracts a human-readable message from an error
+// returned by the SSLMate client. Only a *sslmate.GenericOpenAPIError whose
+// Model() decoded into a sslmate.ErrorObject carries a message that way; a
+// transport failure (connection refused, DNS failure, timeout) comes back
+// as a plain error such as *url.Error, and an OpenAPI error outside the
+// 400-599 range never gets a model attached. Both must fall back to
+// err.Error() instead of panicking on the unchecked assertions this
+// replaces.
+func sslMateErrorMessage(err error) string {
+	var apiErr *sslmate.GenericOpenAPIError
+	if errors.As(err, &apiErr) {
+		if errObj, ok := apiErr.Model().(sslmate.ErrorObject); ok {
+			return errObj.Message
+		}
+	}
+	return err.Error()
+}
+
 func (s *DiscoveryAPIService) DiscoveryCertificates(ctx context.Context, discovery *db.Discovery, domain string, apiKey string, includeSubdomains bool, matchWildcards bool, discoveredFrom time.Time, discoveredBefore time.Time) {
 	client := newSSLMateClient()
 
@@ -226,7 +245,7 @@ func (s *DiscoveryAPIService) DiscoveryCertificates(ctx context.Context, discove
 			}
 
 			// Log the error and prepare for the next retry
-			s.log.With(logger.Fields(ctx)...).Error("Attempt " + strconv.Itoa(attempt+1) + " failed: " + err.(*sslmate.GenericOpenAPIError).Model().(sslmate.ErrorObject).Message)
+			s.log.With(logger.Fields(ctx)...).Error("Attempt " + strconv.Itoa(attempt+1) + " failed: " + sslMateErrorMessage(err))
 
 			// Introduce a random delay before retrying
 			waitTime := baseDelay * time.Duration(1<<attempt)             // Exponential backoff
@@ -237,7 +256,7 @@ func (s *DiscoveryAPIService) DiscoveryCertificates(ctx context.Context, discove
 		}
 
 		if err != nil {
-			s.failDiscovery(ctx, discovery, err.(*sslmate.GenericOpenAPIError).Model().(sslmate.ErrorObject).Message)
+			s.failDiscovery(ctx, discovery, sslMateErrorMessage(err))
 			return
 		}
 
